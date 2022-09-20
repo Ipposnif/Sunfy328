@@ -1,7 +1,6 @@
 //   <!--------------------------------------------------------------------------------------------->
 //   <!--    SUNFY328                                                                             -->
 //   <!--    IRRIGATION CONTROL UNIT                                                              -->
-//   <!--    by Fabrizio Ranieri (2022)                                                           -->
 //   <!--    Hardware and instructions at www.picapot.com                                         -->
 //   <!--                                                                                         -->
 //   <!--    This program is free software; you can redistribute it and/or                        -->
@@ -28,17 +27,13 @@
 
 // SYSTEM SETTINGS ////////////////////////////////////////////////////////
 #define SCREEN_INTERFACE 1            // 0=I2C screen connected to port P7 or port P3  1=SPI screen connected to port P8
-#define SCREEN_TYPE &Adafruit128x64    // use &SH1106_128x64 for the SH1106 screen and &Adafruit128x64 for the SSD1306/SSD1309 screen
+#define SCREEN_TYPE &Adafruit128x64   // use &SH1106_128x64 for the SH1106 screen and &Adafruit128x64 for the SSD1306/SSD1309 screen
 #define SCREEN_SLEEP_SEC 120          // turn OFF the screen after n seconds of inactivity. 0=screen always ON.
 #define SCREEN_CONTRAST 230           // 0-255
-#define TEMPERATURE_SENSOR_TYPE 2     // 0=sensor not present  1=internal atmega328 temperature sensor  2=onewire DS18B20 temperature sensor
-#define SOIL_SENSOR_TYPE 1            // 0=sensor not present  1=onewire DS18B20 humidity sensor
-#define SOIL_SENSOR_MIN 0             // minimum humidity value returned by the sensor
-#define SOIL_SENSOR_MAX 65535         // maximum humidity value returned by the sensor
-#define SOIL_SENSOR_INVERTED 0        // 0=sensor returns low values for low humidity and high values for high humidity  1=inverted logic    
-#define INT_TEMP_COMP -8              // compensation in celsius applied to the internal atmega328 temperature
+#define INT_TEMP_COMP 0               // compensation in celsius applied to the internal atmega328 temperature
 #define CLOCK_ADDRESS 0x68            // I2C address of the Real Time Clock DS1307
 #define SCREEN_ADDRESS 0x3C           // I2C address of the I2C screen 
+#define CATNIP_SENSOR_ADDRESS 0x20    // I2C address of the Catnip sensor 
 #define BLINK_FREQ 200                // blinking frequency in ms for the edit mode
 #define EDIT_FREQ 70                  // buttons processing frequency. It sets the speed for auto increase/decrease when the buttons 2 and 3 are kept pressed in edit mode.
 #define DEBOUNCE_DELAY 25             // button debouncing delay in ms
@@ -51,7 +46,7 @@
 #define DEFAULT_TIMEZONE +4           // after a reset the system starts with this timezone value. The timezone is expressed counting the quarters d'hour present in the desired timezone. Default is +4 (+01.00 Berlin, Rome, Paris, Madrid, Warsaw, Malta). For example, Venezuela(-04:30) has value -18.
 #define DEFAULT_DAYLIGHT_SAVING 1     // after a reset the system starts with this daylight saving value. 0=daylight saving OFF 1=daylight saving ON
 #define DEFAULT_ALARM_STATUS 1        // 0=default setting is both alarms OFF. If the backup battery runs flat, after a black-out sunfy328 will not water and wait for a reset confirmation from the user. This option is to make installations safe during watering hours.
-                                      // 1=default setting is both alarms ON. If the backup battery runs flat, after a black-out sunfy328 will automatically reset itself and it will water using the default settings. This is to keep Sunfy328 running even if the battery has gone.
+                                      // 1=default setting is both alarms ON. If the backup battery runs flat, after a black-out sunfy328 will automatically reset itself and it will water using the default settings (at a ramdomly wrong time). This is to avoid that Sunfy328 stops watering if no one changes the battery.
                                       
 // PINS ////////////////////////////////////////////////////////
 #define PIN_INT0 2                   // Interrupt 0 wired to the 1Hz square wave of the RTC
@@ -126,8 +121,8 @@ const byte defSettings[50] PROGMEM = {
   DEFAULT_LATITUDE+90,            // 2  0x0A    (125) [0-180]   latitude (-90 +90) [latitude] starts with Malta la=+35 lo=+14
   (DEFAULT_LONGITUDE+180)%256,    // 3  0x0B    (194) [0-255]   longitude (-180 +180) low byte [longitude]
   (DEFAULT_LONGITUDE+180)/256,    // 4  0x0C    (0)   [0-1]     longitude high byte
-  0x03,                           // 5  0x11    (3)   [0-16]    skip ice: skip watering when temperature is below the limit in celsius (0=OFF -4 +10) (default -2 celsius) [skpIce]
-  0x00,                           // 6  0x00    (0)   [0-255]   unused
+  0x03,                           // 5  0x0D    (3)   [0-16]    skip ice: skip watering when temperature is below the limit in celsius (0=OFF -4 +10) (default -2 celsius) [skpIce]
+  0x01,                           // 6  0x0E    (1)   [0-3]     temperature/humidity sensor type: 0=NONE  1=ATMEGA328 TMP  2=I2C CATNIP ELEC  3=1WR DS18B20 2BY  4=1WR DS18B20 4BY [sensorType]
   DEFAULT_DAYLIGHT_SAVING,        // 7  0x0F    (1)   [0-1]     daylight saving enabled 0=no 1=yes [daySav] (it must be set accordingly with the country daylight saving rule)
   0x03,                           // 8  0x10    (3)   [0-8]     adjWater 0-8 = 0-400% [adjWater1] default=150%
   0xF0,                           // 9  0x11    (240) [0-255]   real time clock calibration (-240 +240) low byte  [clockCalibration]
@@ -139,7 +134,7 @@ const byte defSettings[50] PROGMEM = {
   #endif
   0x07,                           // 12 0x14    (7)   [0-23]    alarm 1 hour [alm1DateTime]
   0x00,                           // 13 0x15    (0)   [0-59]    alarm 1 minute [alm1DateTime]
-  0x03,                           // 14 0x16    (3)   [0-21]    alarm 1 duration (index of the array almDurValue) [alm1Duration] 
+  0x05,                           // 14 0x16    (5)   [0-21]    alarm 1 duration (index of the array almDurValue) [alm1Duration] 
   0x14,                           // 15 0x17    (20)  [0-99]    alarm 1 last trig year [alm1DateTime]
   0x01,                           // 16 0x18    (1)   [0-12]    alarm 1 last trig month [alm1DateTime]
   0x01,                           // 17 0x19    (1)   [0-31]    alarm 1 last trig day [alm1DateTime]
@@ -150,19 +145,19 @@ const byte defSettings[50] PROGMEM = {
   #endif
   0x13,                           // 19 0x1B    (19)  [0-23]    alarm 2 hour [alm2DateTime]
   0x00,                           // 20 0x1C    (0)   [0-59]    alarm 2 minute [alm2DateTime]
-  0x03,                           // 21 0x1D    (3)   [0-21]    alarm 2 duration (index of the array almDurValue) [alm2Duration]
+  0x02,                           // 21 0x1D    (2)   [0-21]    alarm 2 duration (index of the array almDurValue) [alm2Duration]
   0x14,                           // 22 0x1E    (20)  [0-99]    alarm 2 last trig year [alm2DateTime]
   0x01,                           // 23 0x1F    (1)   [0-12]    alarm 2 last trig month [alm2DateTime]
   0x01,                           // 24 0x20    (1)   [0-31]    alarm 2 last trig day [alm2DateTime]
   0x00,                           // 25 0x21    (0)   [0-6]     alarm 1 days to skip 0=OFF 1=AUTO 2-6=MAN [skpDays1]
-  0x00,                           // 26 0x22    (0)   [0-99]    alarm 1 skip humidity [skpHumidity1] 0=OFF
+  0x5C,                           // 26 0x22    (92)  [0-99]    alarm 1 skip humidity [skpHumidity1] 0=OFF
   0x4A,                           // 27 0x23    (74)  [0-255]   minimum daylight minutes of the year - low byte - Start with Malta 586 [minDaylightMinutes]
   0x02,                           // 28 0x24    (2)   [0-255]   minimum daylight minutes of the year - high byte
   0x68,                           // 29 0x25    (104) [0-255]   maximum daylight minutes of the year - low byte - Start with Malta 872 [maxDaylightMinutes]
   0x03,                           // 30 0x26    (3)   [0-255]   maximum daylight minutes of the year - high byte
   0x00,                           // 31 0x27    (0)   [0-100]   alarm 1 seasonal water adjustment, performed if option Water is ON [adjWaterResult]
-  0x04,                           // 32 0x28    (4)   [0-23]    watering now duration [alm3Duration]
-  0x00,                           // 33 0x29    (0)   [0-26]    heatwave celsius degrees 0=OFF (30-55) [heatWave]
+  0x01,                           // 32 0x28    (1)   [0-23]    watering now duration [alm3Duration]
+  0x07,                           // 33 0x29    (37)  [0-26]    heatwave celsius degrees 0=OFF (30-55)=(1-25)+29 [heatWave]
   0x14,                           // 34 0x2A    (20)  [0-99]    minimum temperature, last check year [minTempDateTime]
   0x01,                           // 35 0x2B    (1)   [0-12]    minimum temperature, last check month [minTempDateTime]
   0x01,                           // 36 0x2C    (1)   [0-31]    minimum temperature, last check day [minTempDateTime]
@@ -176,7 +171,7 @@ const byte defSettings[50] PROGMEM = {
   0x00,                           // 44 0x34    (0)   [0-23]    today maximum temperature, hour of recording [minTempDateTime]
   0x00,                           // 45 0x35    (0)   [0-59]    today maximum temperature, minute of recording [minTempDateTime]
   0x00,                           // 46 0x36    (0)   [0-6]     alarm 2 days to skip 0=OFF 1=AUTO 2-6=MAN [skpDays2]
-  0x00,                           // 47 0x37    (0)   [0-99]    alarm 2 skip humidity [skpHumidity2] 0=OFF
+  0x5C,                           // 47 0x37    (92)  [0-99]    alarm 2 skip humidity [skpHumidity2] 0=OFF
   0x03,                           // 48 0x38    (3)   [0-8]     alarm 2 adjWater 0-8 [adjWater2] default=150%
   0x00                            // 49 0x39    (0)   [0-255]   unused
 };
@@ -205,47 +200,54 @@ const char month10[] PROGMEM = "NOV";
 const char month11[] PROGMEM = "DEC";
 const char *const months[12] PROGMEM = {month00, month01, month02, month03, month04, month05, month06, month07, month08, month09, month10, month11};
 
+const char sensorType00[] PROGMEM = "NONE";
+const char sensorType01[] PROGMEM = "ATMEGA328";
+const char sensorType02[] PROGMEM = "CATNIP";
+const char sensorType03[] PROGMEM = "DS18B20";
+const char sensorType04[] PROGMEM = "PICAPOT";
+const char *const sensorTypes[5] PROGMEM = {sensorType00, sensorType01, sensorType02, sensorType03, sensorType04};
+
 const char optionOff[] PROGMEM = "OFF";  // alarm 1 options
 const char optionManual[] PROGMEM = "MANUAL";
 const char alm1Opts02[] PROGMEM = "DAWN";
-const char alm1Opts03[] PROGMEM = "DWN-90";
-const char alm1Opts04[] PROGMEM = "DWN-60";
-const char alm1Opts05[] PROGMEM = "DWN-30";
-const char alm1Opts06[] PROGMEM = "DWN+30";
-const char alm1Opts07[] PROGMEM = "DWN+60";
-const char alm1Opts08[] PROGMEM = "DWN+90";
+const char alm1Opts03[] PROGMEM = "DAWN-120]Min";
+const char alm1Opts04[] PROGMEM = "DAWN-60]Min";
+const char alm1Opts05[] PROGMEM = "DAWN-30]Min";
+const char alm1Opts06[] PROGMEM = "DAWN+30]Min";
+const char alm1Opts07[] PROGMEM = "DAWN+60]Min";
+const char alm1Opts08[] PROGMEM = "DAWN+120]Min";
 const char *const alm1Opts[9] PROGMEM = {optionOff, optionManual, alm1Opts02, alm1Opts03, alm1Opts04, alm1Opts05, alm1Opts06, alm1Opts07, alm1Opts08};
 
 const char alm2Opts02[] PROGMEM = "DUSK";
-const char alm2Opts03[] PROGMEM = "DSK-90";
-const char alm2Opts04[] PROGMEM = "DSK-60";
-const char alm2Opts05[] PROGMEM = "DSK-30";
-const char alm2Opts06[] PROGMEM = "DSK+30";
-const char alm2Opts07[] PROGMEM = "DSK+60";
-const char alm2Opts08[] PROGMEM = "DSK+90";
+const char alm2Opts03[] PROGMEM = "DUSK-120]Min";
+const char alm2Opts04[] PROGMEM = "DUSK-60]Min";
+const char alm2Opts05[] PROGMEM = "DUSK-30]Min";
+const char alm2Opts06[] PROGMEM = "DUSK+30]Min";
+const char alm2Opts07[] PROGMEM = "DUSK+60]Min";
+const char alm2Opts08[] PROGMEM = "DUSK+120]Min";
 const char *const alm2Opts[9] PROGMEM = {optionOff, optionManual, alm2Opts02, alm2Opts03, alm2Opts04, alm2Opts05, alm2Opts06, alm2Opts07, alm2Opts08};
 
-const char almDurOpts00[] PROGMEM = "1 Min"; // alarm duration options
-const char almDurOpts01[] PROGMEM = "2 Min";
-const char almDurOpts02[] PROGMEM = "3 Min";
-const char almDurOpts03[] PROGMEM = "4 Min";
-const char almDurOpts04[] PROGMEM = "5 Min";
-const char almDurOpts05[] PROGMEM = "6 Min";
-const char almDurOpts06[] PROGMEM = "7 Min";
-const char almDurOpts07[] PROGMEM = "8 Min";
-const char almDurOpts08[] PROGMEM = "9 Min";
-const char almDurOpts09[] PROGMEM = "10 Min";
-const char almDurOpts10[] PROGMEM = "15 Min";
-const char almDurOpts11[] PROGMEM = "20 Min";
-const char almDurOpts12[] PROGMEM = "25 Min";
-const char almDurOpts13[] PROGMEM = "30 Min";
-const char almDurOpts14[] PROGMEM = "40 Min";
-const char almDurOpts15[] PROGMEM = "50 Min";
-const char almDurOpts16[] PROGMEM = "1 Hour";
-const char almDurOpts17[] PROGMEM = "1H 30M";
-const char almDurOpts18[] PROGMEM = "2[[]Hours";
-const char almDurOpts19[] PROGMEM = "2H 30M";
-const char almDurOpts20[] PROGMEM = "3[[]Hours";
+const char almDurOpts00[] PROGMEM = "1]Min"; // alarm duration options
+const char almDurOpts01[] PROGMEM = "2]Min";
+const char almDurOpts02[] PROGMEM = "3]Min";
+const char almDurOpts03[] PROGMEM = "4]Min";
+const char almDurOpts04[] PROGMEM = "5]Min";
+const char almDurOpts05[] PROGMEM = "6]Min";
+const char almDurOpts06[] PROGMEM = "7]Min";
+const char almDurOpts07[] PROGMEM = "8]Min";
+const char almDurOpts08[] PROGMEM = "9]Min";
+const char almDurOpts09[] PROGMEM = "10]Min";
+const char almDurOpts10[] PROGMEM = "15]Min";
+const char almDurOpts11[] PROGMEM = "20]Min";
+const char almDurOpts12[] PROGMEM = "25]Min";
+const char almDurOpts13[] PROGMEM = "30]Min";
+const char almDurOpts14[] PROGMEM = "40]Min";
+const char almDurOpts15[] PROGMEM = "50]Min";
+const char almDurOpts16[] PROGMEM = "1]Hour";
+const char almDurOpts17[] PROGMEM = "1.5]Hours";
+const char almDurOpts18[] PROGMEM = "2]Hours";
+const char almDurOpts19[] PROGMEM = "2.5]Hours";
+const char almDurOpts20[] PROGMEM = "3]Hours";
 const char *const almDurOpts[21] PROGMEM = {almDurOpts00, almDurOpts01, almDurOpts02, almDurOpts03, almDurOpts04, almDurOpts05, almDurOpts06, almDurOpts07, almDurOpts08, almDurOpts09, almDurOpts10, almDurOpts11, almDurOpts12, almDurOpts13, almDurOpts14, almDurOpts15, almDurOpts16, almDurOpts17, almDurOpts18, almDurOpts19, almDurOpts20};
 
 // each battery level picture is formed by two characters
@@ -270,18 +272,17 @@ struct dateTime {
 dateTime alm1DateTime, alm2DateTime; // hour/minute parts of the structure contain the alarm scheduling time, day/month/year parts contain the date of the last triggered alarm
 dateTime dtm; // datetime of the clock, it is refreshed every interrupt
 dateTime dtm_ds; // datetime of the clock including daylight saving
-byte alm1Option, alm1Duration, alm2Option, alm2Duration, alm3Duration, daySav, skpIce, skpHumidity1, skpDays1, skpHumidity2, skpDays2, heatWave, batteryLevel, tempUnit; //options variables
-int timezone, latitude, longitude, minDaylightMinutes, maxDaylightMinutes, adjWater1, adjWaterResult, adjWater2; //options variables
-int soilSensorValue, temperatureSensorValue, InternalVoltage;
-unsigned int soilSensorValueRaw;
-unsigned long screenCt=0;
+byte alm1Option, alm1Duration, alm2Option, alm2Duration, alm3Duration, daySav, skpIce, skpHumidity1, skpDays1, skpHumidity2, skpDays2, heatWave, batteryLevel, tempUnit, sensorType; //options variables
+int timezone, latitude, longitude, minDaylightMinutes, maxDaylightMinutes, adjWater1, adjWaterResult, adjWater2, clockCalibration; //options variables
+int temperatureSensorValue, temperatureSensorValueRaw, InternalVoltage;
+unsigned int soilSensorValue, soilSensorValueRaw, soilSensorMin=0, soilSensorMax=65535;
+bool soilSensorInverted=0;
 //The user interface of Sunfy328 is organized in 8 screens.
-const byte blinkPosCt[8] = {7, 4, 7, 7, 4, 1, 0, 0}; // total input cells of every screen. screen temperature and screen about have no edit mode and are set to zero.
+const byte blinkPosCt[8] = {7, 4, 7, 7, 5, 1, 0, 0}; // total input cells of every screen. screen temperature and screen about have no edit mode and are set to zero.
 dateTime minTempDateTime, maxTempDateTime; // hour/minute parts of the structure containing the recording time of the min/max temperature of the day, day/month/year parts containing the date of the last temperature check
 int minTempValue, maxTempValue;
-int clockCalibration;
 byte calibration[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // clock calibration 240 bit array
-const int8_t alarmDDAdjust[9] = {0, 0, 0, -90, -60, -30, 30, 60, 90}; // values in minutes of the alarm options (dusk and dawn adjustment)
+const int8_t alarmDDAdjust[9] = {0, 0, 0, -120, -60, -30, 30, 60, 120}; // values in minutes of the alarm options (dusk and dawn adjustment)
 const byte almDurValue[21] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60, 90, 120, 150, 180}; // values in minutes of the alarm durations
 unsigned int soilMoistureSample[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // the soil moisture sensor value is an average of the last 10 samples
 int temperatureSample[10] = {25, 25, 25, 25, 25, 25, 25, 25, 25, 25}; // the temperature value is an average of the last 10 samples
@@ -294,7 +295,7 @@ byte AlmTrig = 0; // contains the currently firing alarm. 0=none  1=alarm-1  2=a
 bool btn1Status = true, btn2Status = true, btn3Status = true; // pressing status of the buttons
 bool lastBtn1Status = false, lastBtn2Status = false, lastBtn3Status = false; // button debounce status
 bool skipButtonProcess = false; // flag to skip process of the button that woke up from sleep mode
-byte sensorErr=0; // count of consecutive communication errors with the sensor
+byte sensorErr=3; // count of consecutive communication errors with the sensor. Status is error until the first good sample.
 byte btn1 = 1, btn2 = 1, btn3 = 1; // processing status of the buttons: 0=pressed  1=not pressed  2=press process completed
 byte pressCt = 0, sleepCt = 0;
 byte activeScreen = 1, blinkPos = 0; // current screen, current input cell of a screen in edit mode
@@ -408,8 +409,32 @@ void setup() {
   }
   wdt_reset();
   batteryLevel = getBatteryLevel();
-  //connect to the 1-wire sensor
-  #if (TEMPERATURE_SENSOR_TYPE==2)
+ 
+  //internal atmega328 temperature
+  if (sensorType==1)
+  {
+      showMsg(6, F("SNS OK"));
+      delay(333);
+  }
+  //I2C sensor
+  if (sensorType==2)
+  {
+    Wire.begin();
+    Wire.beginTransmission(0x20);
+    Wire.write(6);    
+    if (Wire.endTransmission() != 0) {
+      showMsg(6, F("SNS ERR"));
+      delay(2000);
+    }
+    else
+    {
+      showMsg(6, F("SNS OK"));
+      delay(333);
+    }
+  }
+  //1-wire sensor
+  if (sensorType==3 || sensorType==4)
+  {
     oneWire.target_search(0x28);
     if ( !oneWire.search(temperatureSensorAddress)) {
       showMsg(6, F("SNS ERR"));
@@ -419,7 +444,8 @@ void setup() {
       showMsg(6, F("SNS OK"));
       delay(333);
     }
-  #endif
+  }
+  
   wdt_reset();
   Blink(150, 333);
   Blink(150, 333);
@@ -449,6 +475,8 @@ ISR (PCINT0_vect) {
 
 void loop()
 {
+  long i = 0;
+    
   wdt_reset(); // restart the 8 seconds counter of the watchdog
   byte _intBTN = intBTN; // copy volatile flags to local variables
   byte _intRTC = intRTC;
@@ -480,16 +508,68 @@ void loop()
       Blink(1, 0); // blink the led for 1 millisecond
       //ActivateClockOscillator(); // this is done every second because there is a (very rare) chance that the clock oscillator stops oscillating while the square wave remains in good working order.
 
-      if ((dtm.second%2)==0)
+      if ((dtm.second%2)==0) //every two seconds check the sensor
       {
-        #if (TEMPERATURE_SENSOR_TYPE==1) 
-          temperatureSensorValue = readInternalTemp(temperatureSensorValue);
-        #endif           
-        #if (TEMPERATURE_SENSOR_TYPE==2)
-          getTemperatureAndHumidity();
-        #endif
+        if (sensorType==1) //Internal ATMega328 temp sensor
+        {
+          temperatureSensorValueRaw = readInternalTemp(temperatureSensorValue);
+        }    
+        
+        if (sensorType==2) //I2C sensor by Catnip Ele
+        {
+          soilSensorValueRaw=readI2CSensorRegister(CATNIP_SENSOR_ADDRESS, 0);
+          temperatureSensorValueRaw=readI2CSensorRegister(CATNIP_SENSOR_ADDRESS, 5)/10;
+          soilSensorMin=100;
+          soilSensorMax=600;
+        }
+        
+        if (sensorType==3 || sensorType==4) // 1-wire sensors based on DS18B20
+        {
+          getTemperatureAndHumidity_DS18B20();
+        }        
       }
-      
+
+      //average of the last 10 temperature and humidity samples
+      if (sensorErr==0)
+      {
+        for (byte x = 0; x < 9; x++ ) {
+          temperatureSample[x] = temperatureSample[x + 1];
+        }
+        temperatureSample[9] = temperatureSensorValueRaw;
+        
+        i = soilSensorValueRaw;
+        if (i < soilSensorMin)
+        {
+          i = soilSensorMin;
+        }
+        i = i - soilSensorMin;
+        if (i > (soilSensorMax - soilSensorMin))
+        {
+          i = soilSensorMax - soilSensorMin;
+        }
+        i = int(i * 100 / (soilSensorMax - soilSensorMin)); //humidity from 0=min to 100=max
+        if (soilSensorInverted) //humidity from 0=max to 100=min
+        {
+          i = 100 - i;
+        }
+        for (byte x = 0; x < 9; x++ ) {
+          soilMoistureSample[x] = soilMoistureSample[x + 1];
+        }
+        soilMoistureSample[9] = i;
+
+        i = 0;
+        for (byte x = 0; x < 10; x++ ) {
+          i = i + temperatureSample[x];
+        }
+        temperatureSensorValue = i / 10; 
+        i = 0;
+        for (byte x = 0; x < 10; x++ ) {
+          i = i + soilMoistureSample[x];
+        }
+        soilSensorValue = i / 10;        
+      }
+
+  
       //record the minimum and maximum temperature of the day
       if (dateDiff(minTempDateTime, dtm_ds) == 0) {
         if (temperatureSensorValue < minTempValue) {
@@ -551,7 +631,6 @@ void loop()
     SwitchOffAlarms(); // check if there is an alarm to switch OFF
     if (editMode == false) { // screen is refreshed every interrupt if not in edit mode
       refreshNow = true;
-      screenCt++;
     }
   } // end of interrupts processing
   
@@ -620,7 +699,6 @@ void loop()
   delay(2);
 } // End of loop
 // ========================================================================================
-
 
 
 
@@ -804,6 +882,7 @@ void Settings2Variables(byte* data) { // convert the settings from an array of b
   latitude = data[2] - 90;
   longitude = (data[3] + data[4] * 256) - 180;
   skpIce = data[5];
+  sensorType = data[6];
   daySav = data[7];
   adjWater1 = data[8];
   clockCalibration = (data[9] + data[10] * 256) - 240;
@@ -852,7 +931,7 @@ void Variables2Settings(byte* data) { // convert the settings from global variab
   data[3] = (longitude + 180) % 256;
   data[4] = (longitude + 180) / 256;
   data[5] = skpIce;
-  data[6] = 0;
+  data[6] = sensorType; 
   data[7] = daySav;
   data[8] = adjWater1;
   data[9] = (clockCalibration + 240) % 256;
@@ -1023,8 +1102,8 @@ void CheckAlarms() {
     if (skipAlarm == false) { 
       if (((AlmTrig == 1 ? skpDays1 : skpDays2) == 0) || (daysToSkip <= daysSinceLastAlarm)) // skip days is off or skip days condition is true
       {
-        if  (((AlmTrig == 1) && (skpHumidity1 == 0 || sensorErr > 1 || TEMPERATURE_SENSOR_TYPE==0 || soilSensorValue <= skpHumidity1)) 
-              || ((AlmTrig == 2) && (skpHumidity2 == 0 || sensorErr > 1 || TEMPERATURE_SENSOR_TYPE==0 || soilSensorValue <= skpHumidity2))) // skip humidity
+        if  (((AlmTrig == 1) && (skpHumidity1 == 0 || sensorErr > 1 || sensorType==0 || soilSensorValue < skpHumidity1)) 
+              || ((AlmTrig == 2) && (skpHumidity2 == 0 || sensorErr > 1 || sensorType==0 || soilSensorValue < skpHumidity2))) // skip humidity
         {
           if ((skpIce == 0) || (temperatureSensorValue >= (skpIce - 5))) // skip ice
           {
@@ -1578,9 +1657,11 @@ void ProcessButtons() {
         if (blinkPos == 3) {
           heatWave = ((heatWave  == 0 && btn2 == 0) ? 26 : (heatWave == 26 && btn3 == 0) ? 0 : (heatWave + ((btn2 == 0) ? -1 : + 1)));
         }
-
         if (blinkPos == 4) {
           clockCalibration = ((clockCalibration  == -240 && btn2 == 0) ? 240 : (clockCalibration == 240 && btn3 == 0) ? -240 : (clockCalibration + ((btn2 == 0) ? -1 : + 1)));
+        }
+        if (blinkPos == 5) {
+          sensorType = ((sensorType  == 0 && btn2 == 0) ? 4 : (sensorType == 4 && btn3 == 0) ? 0 : (sensorType + ((btn2 == 0) ? -1 : + 1)));
         }
       }
 
@@ -1712,7 +1793,7 @@ void PrintScreen(byte scr) {
       Print(0, 0, false, F("&^"), blinkStatus == true  ? ""  : "  WATERING", "", "", "", "");
       mss = AlarmDuration(AlmTrig);
       mss = mss - (millis() - lastAlm) + 1000;
-      Print(0, 6, false, mss > 3600000 ? F("& &%^") : F(" &  &%^"), msToChar(cstr1, mss), (sensorErr<2 && TEMPERATURE_SENSOR_TYPE==2) ? lngToChar(cstr2, soilSensorValue, false) : "--" , "", "", "");
+      Print(0, 6, false, mss > 3600000 ? F("& &%^") : F(" &  &%^"), msToChar(cstr1, mss), (sensorErr<2 && (sensorType==2 or sensorType==4)) ? lngToChar(cstr2, soilSensorValue, false) : "--" , "", "", "");
     }
     else
     {
@@ -1724,10 +1805,10 @@ void PrintScreen(byte scr) {
 
       strcpy_P(buffer1, (char *)pgm_read_word(&(batteryChargePict[batteryLevel])));
 
-      int sp = (sensorErr<2 && TEMPERATURE_SENSOR_TYPE==2) ? ((temp < -9 || temp > 99 ? 1 : 5) + (temp > -1 && temp < 10 ? 5 : 0) + (soilSensorValue < 10 ? 5 : 0)) : 5;
+      int sp = (sensorErr<2 && (sensorType==2 or sensorType==4)) ? ((temp < -9 || temp > 99 ? 1 : 5) + (temp > -1 && temp < 10 ? 5 : 0) + (soilSensorValue < 10 ? 5 : 0)) : 5;
       
       Screen.clear(0, sp - 1, 6 , 7);
-      Print(sp, 6, false, F("& ]&& ]&%^"), (batteryLevel == 0 && blinkStatus == true) ? "  " : buffer1, (sensorErr<2 && (TEMPERATURE_SENSOR_TYPE>0)) ? lngToChar(cstr1, temp, false) : "--" , tempUnit ? "," : "~", (sensorErr<2 && TEMPERATURE_SENSOR_TYPE==2) ? lngToChar(cstr2, soilSensorValue, false) : "--", "");
+      Print(sp, 6, false, F("& ]&& ]&%^"), (batteryLevel == 0 && blinkStatus == true) ? "  " : buffer1, (sensorErr<2 && (sensorType>0)) ? lngToChar(cstr1, temp, false) : "--" , tempUnit ? "," : "~", (sensorErr<2 && (sensorType==2 or sensorType==4)) ? lngToChar(cstr2, soilSensorValue, false) : "--", "");
     }
     //time
     Screen.setFont(arialNarrow15x27);
@@ -1780,6 +1861,9 @@ void PrintScreen(byte scr) {
           (blkStatus == true && blinkPos == 3 ? " "  : (heatWave == 0 ? " " : (tempUnit ? "," : "~"))), "", "", "");
     Print(0, 5, false, F("CLOCK CALIBRAT.= &&^"), (blkStatus == true && blinkPos == 4 ? " "  : (clockCalibration >= 0 ? "+" : "")),
           (blkStatus == true && blinkPos == 4 ? "   "  : lngToChar(cstr1, clockCalibration, false)), "", "", "");
+    strcpy_P(buffer1, (char *)pgm_read_word(&(scr == 3 ? sensorTypes[sensorType] : sensorTypes[sensorType])));
+    Print(0, 6, false, F("SENSOR= &^"), (blkStatus == true && blinkPos == 5 ? ""  : buffer1), "", "", "", "");
+              
   }
 
   else if (scr == 6) { // IMMEDIATE WATER ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1807,7 +1891,7 @@ void PrintScreen(byte scr) {
     Print(0, 5, false, F("DURATION=&^"), msToChar(cstr1, AlarmDuration(2)), "",  "", "", "");
     InternalVoltage = readVcc();
     Print(0, 6, false, F("VCC=& BAT=&^"), lngToChar(cstr1, InternalVoltage, false), lngToChar(cstr2, getBatteryMillivolts(), false),  "", "", "");
-    Print(0, 7, false, F("HUM=& &% TMP=&&^"), (sensorErr<2 && TEMPERATURE_SENSOR_TYPE==2) ? lngToChar(cstr1, soilSensorValueRaw, false) : "---" , (sensorErr<2 && TEMPERATURE_SENSOR_TYPE==2) ? lngToChar(cstr2, soilSensorValue, false) : "--" ,  (sensorErr<2 && (TEMPERATURE_SENSOR_TYPE>0)) ? lngToChar(cstr3, temp, false) : "--" , (tempUnit ? "," : "~"), "");
+    Print(0, 7, false, F("HUM=& &% TMP=&&^"), (sensorErr<2 && (sensorType==2 or sensorType==4)) ? lngToChar(cstr1, soilSensorValueRaw, false) : "---" , (sensorErr<2 && (sensorType==2 or sensorType==4)) ? lngToChar(cstr2, soilSensorValue, false) : "--" ,  (sensorErr<2 && (sensorType>0)) ? lngToChar(cstr3, temp, false) : "--" , (tempUnit ? "," : "~"), "");
     
   }
   
@@ -2051,7 +2135,7 @@ bool IsSummerTime(dateTime inDtm) { // return true if datetime is in the summer 
 }
 
 
-void getTemperatureAndHumidity() {
+void getTemperatureAndHumidity_DS18B20() {
   int16_t r = 0;
   long i = 0;
   byte data[12];
@@ -2070,52 +2154,16 @@ void getTemperatureAndHumidity() {
         r = (float)r / 16;
         byte tmpSign = (data[1] & 0b10000000) + (data[1] & 0b01000000) + (data[1] & 0b00100000) + (data[1] & 0b00010000) + (data[1] & 0b00001000) + (data[1] & 0b00000100);
         i = (long)data[2] * 256 + data[3];
-  
+        soilSensorValueRaw = sensorType==3 ? 0 : i;
         if ((r > -41) && (r < 86) && (tmpSign == 0 || tmpSign == 6)) { // && (i < 1024)
           r = r * (tmpSign == 0 ? +1 : -1);
-          for (byte x = 0; x < 9; x++ ) {
-            temperatureSample[x] = temperatureSample[x + 1];
-          }
-          temperatureSample[9] = r;
-          
-          if (i < SOIL_SENSOR_MIN)
-          {
-            i = SOIL_SENSOR_MIN;
-          }
-          i = i - SOIL_SENSOR_MIN;
-          if (i > (SOIL_SENSOR_MAX - SOIL_SENSOR_MIN))
-          {
-            i = SOIL_SENSOR_MAX - SOIL_SENSOR_MIN;
-          }
-          soilSensorValueRaw = i;
-  
-          //humidity from 0=min to 100=max
-          i = int(i * 100 / (SOIL_SENSOR_MAX - SOIL_SENSOR_MIN));
-          //humidity from 0=max to 100=min
-          #if (SOIL_SENSOR_INVERTED==1)
-            i = 100 - i;
-          #endif
-          //soilSensorValue=i;
-          //temperatureSensorValue = r;
-          
-          for (byte x = 0; x < 9; x++ ) {
-            soilMoistureSample[x] = soilMoistureSample[x + 1];
-          }
-          soilMoistureSample[9] = i;
-  
+          temperatureSensorValueRaw = r;
+          sensorErr=0;
         }
-        r = 0;
-        for (byte x = 0; x < 10; x++ ) {
-          r = r + temperatureSample[x];
+        else
+        {
+          sensorErr++;
         }
-        temperatureSensorValue = r / 10;
-  
-        i = 0;
-        for (byte x = 0; x < 10; x++ ) {
-          i = i + soilMoistureSample[x];
-        }
-        soilSensorValue = i / 10;
-        sensorErr=0;
       }
       else
       {
@@ -2131,6 +2179,24 @@ void getTemperatureAndHumidity() {
   {
     sensorErr++;
   }
+}
+
+unsigned int readI2CSensorRegister(int addr, int reg) {
+  unsigned int t = 0;
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission() != 0) {
+    sensorErr++;
+  }
+  else
+  {
+    delay(20);
+    Wire.requestFrom(addr, 2);
+    t = Wire.read() << 8;
+    t = t | Wire.read();
+    sensorErr=0;
+  }
+  return t;
 }
 
 // Read atmega328 internal temperature
@@ -2162,6 +2228,7 @@ double readInternalTemp(double prevTemp)
     i = i + temperatureSample[x];
   }
   res = i / 10;
+  sensorErr=0;
   return res;
 }
 
