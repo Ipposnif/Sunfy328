@@ -1183,7 +1183,7 @@ unsigned long AlarmDuration(byte alm)
   }
   else {
     t = almDurValue[(alm == 1 ? alm1Duration : alm2Duration) - 1] * 60;
-    t = t * (100 + ((alm == 1 ? adjWater1 : adjWater2) * adjWaterResult)) * 5; // apply automatic adjustment of the watering period
+    t = t * (100+((adjWaterResult * (alm == 1 ? adjWater1 : adjWater2) * 50)/100)) * 10; // automatic adjustment of the watering period
   }
 
   if (heatWave != 0 && alm != 3 && sensorErr<2) { // if option heat is ON and the limit temperature has been reached, apply the adjustment to the watering period
