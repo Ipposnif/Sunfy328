@@ -210,21 +210,21 @@ const char *const sensorTypes[5] PROGMEM = {sensorType00, sensorType01, sensorTy
 const char optionOff[] PROGMEM = "OFF";  // alarm 1 options
 const char optionManual[] PROGMEM = "MANUAL";
 const char alm1Opts02[] PROGMEM = "DAWN";
-const char alm1Opts03[] PROGMEM = "DAWN-120]Min";
-const char alm1Opts04[] PROGMEM = "DAWN-60]Min";
-const char alm1Opts05[] PROGMEM = "DAWN-30]Min";
-const char alm1Opts06[] PROGMEM = "DAWN+30]Min";
-const char alm1Opts07[] PROGMEM = "DAWN+60]Min";
-const char alm1Opts08[] PROGMEM = "DAWN+120]Min";
+const char alm1Opts03[] PROGMEM = "DAWN+30]Mins";
+const char alm1Opts04[] PROGMEM = "DAWN+1]Hour";
+const char alm1Opts05[] PROGMEM = "DAWN+2]Hours";
+const char alm1Opts06[] PROGMEM = "DAWN+3]Hours";
+const char alm1Opts07[] PROGMEM = "DAWN+4]Hours";
+const char alm1Opts08[] PROGMEM = "DAWN+5]Hours";
 const char *const alm1Opts[9] PROGMEM = {optionOff, optionManual, alm1Opts02, alm1Opts03, alm1Opts04, alm1Opts05, alm1Opts06, alm1Opts07, alm1Opts08};
 
 const char alm2Opts02[] PROGMEM = "DUSK";
-const char alm2Opts03[] PROGMEM = "DUSK-120]Min";
-const char alm2Opts04[] PROGMEM = "DUSK-60]Min";
-const char alm2Opts05[] PROGMEM = "DUSK-30]Min";
-const char alm2Opts06[] PROGMEM = "DUSK+30]Min";
-const char alm2Opts07[] PROGMEM = "DUSK+60]Min";
-const char alm2Opts08[] PROGMEM = "DUSK+120]Min";
+const char alm2Opts03[] PROGMEM = "DUSK-30]Mins";
+const char alm2Opts04[] PROGMEM = "DUSK-1]Hour";
+const char alm2Opts05[] PROGMEM = "DUSK-2]Hours";
+const char alm2Opts06[] PROGMEM = "DUSK-3]Hours";
+const char alm2Opts07[] PROGMEM = "DUSK-4]Hours";
+const char alm2Opts08[] PROGMEM = "DUSK-5]Hours";
 const char *const alm2Opts[9] PROGMEM = {optionOff, optionManual, alm2Opts02, alm2Opts03, alm2Opts04, alm2Opts05, alm2Opts06, alm2Opts07, alm2Opts08};
 
 const char almDurOpts00[] PROGMEM = "1]Min"; // alarm duration options
@@ -282,7 +282,7 @@ const byte blinkPosCt[8] = {7, 4, 7, 7, 5, 1, 0, 0}; // total input cells of eve
 dateTime minTempDateTime, maxTempDateTime; // hour/minute parts of the structure containing the recording time of the min/max temperature of the day, day/month/year parts containing the date of the last temperature check
 int minTempValue, maxTempValue;
 byte calibration[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // clock calibration 240 bit array
-const int8_t alarmDDAdjust[9] = {0, 0, 0, -120, -60, -30, 30, 60, 120}; // values in minutes of the alarm options (dusk and dawn adjustment)
+const int8_t alarmDDAdjust[9] = {0, 0, 0, 3, 6, 12, 18, 24, 30}; // values in minutes/10 of the alarm options (dusk and dawn adjustment)
 const byte almDurValue[21] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60, 90, 120, 150, 180}; // values in minutes of the alarm durations
 unsigned int soilMoistureSample[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // the soil moisture sensor value is an average of the last 10 samples
 int temperatureSample[10] = {25, 25, 25, 25, 25, 25, 25, 25, 25, 25}; // the temperature value is an average of the last 10 samples
@@ -1480,7 +1480,7 @@ void AdjNextAlarmAndWater() {
       else {
         tmm  = mm2;
       }
-      tmm = tmm + alarmDDAdjust[by];
+      tmm = tmm + (alm == 1 ? alarmDDAdjust[by] : -alarmDDAdjust[by]) * 10;
       if (tmm < 0 || tmm > 1440) {
         tmm = 0;
       }
